@@ -1,6 +1,11 @@
 use std::time::Duration;
 
-use axum::{Router, http::StatusCode, response::Html, routing::get};
+use axum::{
+    Router,
+    http::StatusCode,
+    response::{Html, IntoResponse},
+    routing::get,
+};
 use tokio::{net::TcpListener, signal, time::sleep};
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -23,6 +28,8 @@ async fn main() {
         .route("/", get(handler))
         .route("/slow", get(|| sleep(Duration::from_secs(5))))
         .route("/forever", get(std::future::pending::<()>))
+        .fallback(handler_404)
+        // Tracing must be the last layer to trace other layers above
         .layer((
             TraceLayer::new_for_http(),
             TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(10)),
@@ -58,6 +65,10 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "nothing to see here")
 }
 
 async fn handler() -> Html<&'static str> {
