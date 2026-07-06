@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+askama = { version = "0.16.0", default-features = false, features = ["std", "derive"] }
 axum = { version = "0.8.9", features = ["tracing"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "signal"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.0", features = ["request-id", "timeout", "trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+http-body-util = "0.1.3"

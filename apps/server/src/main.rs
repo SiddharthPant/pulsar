@@ -1,8 +1,9 @@
 use std::time::Duration;
 
+use askama::Template;
 use axum::{
     Router,
-    extract::Request,
+    extract::{self, Request},
     http::{HeaderName, StatusCode},
     response::{Html, IntoResponse},
     routing::get,
@@ -64,19 +65,15 @@ async fn main() {
         )
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
-    let app = Router::new()
-        .route("/", get(handler))
-        .route("/slow", get(|| sleep(Duration::from_secs(5))))
-        .route("/forever", get(std::future::pending::<()>))
-        .fallback(handler_404)
+    let app = app()
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(10),
         ))
         .layer(middleware);
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
+    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    tracing::info!("listening on http://{}/", listener.local_addr().unwrap());
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -107,10 +104,74 @@ async fn shutdown_signal() {
     }
 }
 
+fn app() -> Router {
+    Router::new()
+        .route("/", get(handler))
+        .route("/slow", get(|| sleep(Duration::from_secs(5))))
+        .route("/forever", get(std::future::pending::<()>))
+        .route("/greet/{name}", get(greet))
+        .fallback(handler_404)
+}
+
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "nothing to see here")
 }
 
 async fn handler() -> Html<&'static str> {
     Html("<h1>Hello, World!</h1>")
+}
+
+async fn greet(extract::Path(name): extract::Path<String>) -> impl IntoResponse {
+    let template = HelloTemplate { name };
+    HtmlTemplate(template)
+}
+
+#[derive(Template)]
+#[template(path = "hello.html")]
+struct HelloTemplate {
+    name: String,
+}
+
+struct HtmlTemplate<T>(T);
+
+impl<T> IntoResponse for HtmlTemplate<T>
+where
+    T: Template,
+{
+    fn into_response(self) -> axum::response::Response {
+        match self.0.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to render template. Error: {err}"),
+            )
+                .into_response(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use http_body_util::BodyExt;
+
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn test_main() {
+        let response = app()
+            .oneshot(Request::get("/greet/Foo").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body();
+        let bytes = body.collect().await.unwrap().to_bytes();
+        let html = String::from_utf8(bytes.to_vec()).unwrap();
+
+        assert_eq!(html, "<h1>Hello, Foo!</h1>");
+    }
 }
