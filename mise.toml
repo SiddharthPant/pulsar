@@ -1,0 +1,9 @@
+[tools]
+rust = "1.96"
+watchexec = "latest"
+
+[env]
+_.file = [".env", ".env.local"]
+
+[tasks."db:prompt"]
+run = "docker compose exec db psql -U postgres -d app_db"
