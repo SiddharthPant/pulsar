@@ -1,0 +1,12 @@
+profile = "jinja"
+blank_line_before_tag = "load,extends,include,block"
+indent = 2
+format_css = true
+format_js = true
+use_gitignore = true
+
+[css]
+indent_size = 2
+
+[js]
+indent_size = 2

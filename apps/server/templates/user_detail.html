@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}
+  User Profile - {{ user.full_name }}
+{% endblock %}
+
+{% block body %}
+  <div class="card">
+    <h1>User Account Details</h1>
+    <div class="meta-item">
+      <span class="label">Database Key ID:</span> {{ user.id }}
+    </div>
+    <div class="meta-item">
+      <span class="label">Full Name:</span> {{ user.full_name }}
+    </div>
+    <div class="meta-item">
+      <span class="label">Email Address:</span> {{ user.email }}
+    </div>
+    <a href="/users" class="back-btn">&larr; Back to Directory</a>
+  </div>
+{% endblock %}

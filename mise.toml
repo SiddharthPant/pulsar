@@ -1,4 +1,5 @@
 [tools]
+"cargo:sqlx-cli" = "0.9.0"
 rust = "1.97"
 rust-analyzer = "latest"
 watchexec = "latest"
