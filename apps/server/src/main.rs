@@ -12,6 +12,7 @@ use tokio::{net::TcpListener, signal, time::sleep};
 use tower::ServiceBuilder;
 use tower_http::{
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    services::ServeDir,
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
@@ -66,6 +67,7 @@ async fn main() {
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
     let app = app()
+        .nest_service("/assets", ServeDir::new("assets"))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(10),
@@ -117,20 +119,25 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "nothing to see here")
 }
 
-async fn handler() -> Html<&'static str> {
-    Html("<h1>Hello, World!</h1>")
+async fn handler() -> impl IntoResponse {
+    let template = HelloTemplate;
+    HtmlTemplate(template)
 }
 
 async fn greet(extract::Path(name): extract::Path<String>) -> impl IntoResponse {
-    let template = HelloTemplate { name };
+    let template = GreetTemplate { name };
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
-#[template(path = "hello.html")]
-struct HelloTemplate {
+#[template(path = "greet.html")]
+struct GreetTemplate {
     name: String,
 }
+
+#[derive(Template)]
+#[template(path = "hello.html")]
+struct HelloTemplate;
 
 struct HtmlTemplate<T>(T);
 
