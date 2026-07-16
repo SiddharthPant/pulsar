@@ -8,6 +8,7 @@ use axum::{
     response::{Html, IntoResponse},
     routing::get,
 };
+use sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, signal, time::sleep};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -66,7 +67,16 @@ async fn main() {
         )
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
+    let db_url = std::env::var("DATABASE_URL").expect("DB connection URL must be provided");
+    let db_pool = PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(3))
+        .connect(&db_url)
+        .await
+        .expect("can't connect to database");
+
     let app = app()
+        .with_state(db_pool)
         .nest_service("/assets", ServeDir::new("assets"))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
@@ -106,6 +116,14 @@ async fn shutdown_signal() {
     }
 }
 
+// Utility function to map any error to 500 Internal server error
+fn internal_error<E>(err: E) -> (StatusCode, String)
+where
+    E: std::error::Error,
+{
+    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+}
+
 fn app() -> Router {
     Router::new()
         .route("/", get(handler))
@@ -119,8 +137,12 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "nothing to see here")
 }
 
-async fn handler() -> impl IntoResponse {
+async fn handler(State(pool): State<PgPool>) -> impl IntoResponse {
     let template = HelloTemplate;
+    sqlx::query_scalar("select 'hello world from pg'")
+        .fetch_one(&pool)
+        .await
+        .map_err(internal_error);
     HtmlTemplate(template)
 }
 
