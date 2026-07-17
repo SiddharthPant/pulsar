@@ -18,7 +18,12 @@ sqlx = { version = "0.9.0", features = [
   "postgres",
   "uuid",
 ] }
-tokio = { version = "1.52.3", features = ["rt-multi-thread", "signal"] }
+tokio = { version = "1.52.3", features = [
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+] }
 tower = "0.5.3"
 tower-http = { version = "0.7.0", features = [
   "fs",

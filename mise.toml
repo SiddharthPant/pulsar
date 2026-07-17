@@ -23,7 +23,7 @@ exec watchexec --restart \
   -- cargo run -p server
 """
 
-[tasks.check]
+[tasks.test]
 description = "Run all tests"
 run = "cargo test --workspace"
 
@@ -76,6 +76,10 @@ run = 'sqlx migrate add --reversible "$usage_name"'
 [tasks."db:migrate:revert"]
 description = "Revert the latest reversible migration"
 run = "sqlx migrate revert"
+
+[tasks."db:prepare"]
+description = "Generate .sqlx to allow offline compilation"
+run = "cargo sqlx prepare --workspace"
 
 [tasks."db:reset"]
 description = "Drop, recreate, and migrate the development database"

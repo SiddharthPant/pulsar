@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env, net::SocketAddr, time::Duration};
 
 use anyhow::Context;
 use askama::Template;
@@ -10,7 +10,7 @@ use axum::{
     routing::get,
 };
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use tokio::{net::TcpListener, signal, time::sleep};
+use tokio::{net::TcpListener, signal};
 use tower::ServiceBuilder;
 use tower_http::{
     LatencyUnit,
@@ -23,24 +23,69 @@ use tracing::{error, info_span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
-pub struct AppError(anyhow::Error);
+struct Config {
+    database_url: String,
+    bind_addr: SocketAddr,
+    db_max_connections: u32,
+    request_timeout: Duration,
+}
+
+impl Config {
+    fn from_env() -> anyhow::Result<Self> {
+        let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be configured")?;
+
+        let host = env::var("APP_HOST").unwrap_or_else(|_| "127.0.0.1".to_owned());
+
+        let port = env::var("APP_PORT")
+            .unwrap_or_else(|_| "3000".to_owned())
+            .parse::<u16>()
+            .context("APP_PORT must be a valid port number")?;
+
+        let bind_addr: SocketAddr = format!("{host}:{port}")
+            .parse()
+            .context("invalid APP_HOST or APP_PORT")?;
+
+        let db_max_connections = env::var("DB_MAX_CONNECTIONS")
+            .unwrap_or_else(|_| "5".to_owned())
+            .parse::<u32>()
+            .context("DB_MAX_CONNECTIONS must be an integer")?;
+
+        let timeout_seconds = env::var("REQUEST_TIMEOUT_SECONDS")
+            .unwrap_or_else(|_| "10".to_owned())
+            .parse::<u64>()
+            .context("REQUEST_TIMEOUT_SECONDS must be an integer")?;
+
+        Ok(Self {
+            database_url,
+            bind_addr,
+            db_max_connections,
+            request_timeout: Duration::from_secs(timeout_seconds),
+        })
+    }
+}
+
+enum AppError {
+    NotFound(String),
+    Internal(anyhow::Error),
+}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        eprintln!("Critical Application Error: {:?}", self.0);
-        (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+        match self {
+            Self::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
+            Self::Internal(err) => {
+                tracing::error!(error = ?err, "request failed");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+            }
+        }
     }
 }
 
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
-        Self(err)
+        Self::Internal(err)
     }
 }
-
-pub trait IntoError {}
-impl IntoError for sqlx::Error {}
-impl IntoError for askama::Error {}
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
 
@@ -51,6 +96,7 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let config = Config::from_env()?;
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -80,14 +126,14 @@ async fn main() -> anyhow::Result<()> {
                             "request",
                             request_id = ?request_id,
                             method = %request.method(),
-                            uri = %request.uri(),
+                            uri = %request.uri().path(),
                         ),
                         None => {
                             error!("could not extract request_id");
                             info_span!(
                                 "request",
                                 method = %request.method(),
-                                uri = %request.uri(),
+                                uri = %request.uri().path(),
                             )
                         }
                     }
@@ -97,13 +143,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
-    let db_url = std::env::var("DATABASE_URL").expect("DB connection URL must be provided");
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(config.db_max_connections)
         .acquire_timeout(Duration::from_secs(3))
-        .connect(&db_url)
+        .connect(&config.database_url)
         .await
-        .expect("can't connect to database");
+        .context("failed to connect to database")?;
 
     let state = AppState { pool };
 
@@ -112,12 +157,19 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/assets", ServeDir::new("assets"))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(10),
+            config.request_timeout,
         ))
         .layer(middleware);
 
-    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    tracing::info!("listening on http://{}/", listener.local_addr().unwrap());
+    let listener = TcpListener::bind(config.bind_addr)
+        .await
+        .context("failed to bind HTTP listener")?;
+
+    let address = listener
+        .local_addr()
+        .context("failed to read listener address")?;
+
+    tracing::info!(%address, "server listening");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -150,29 +202,27 @@ async fn shutdown_signal() {
 
 fn app() -> Router<AppState> {
     Router::new()
-        .route("/", get(handler))
-        .route("/slow", get(|| sleep(Duration::from_secs(5))))
-        .route("/forever", get(std::future::pending::<()>))
+        .route("/", get(home))
         .route("/greet/{name}", get(greet))
         .route("/users", get(list_users))
         .route("/users/{id}", get(get_user))
-        .fallback(handler_404)
+        .fallback(not_found)
 }
 
-async fn handler_404() -> impl IntoResponse {
+async fn not_found() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "nothing to see here")
 }
 
-async fn handler() -> impl IntoResponse {
+async fn home() -> impl IntoResponse {
     let template = HelloTemplate {};
     HtmlTemplate(template)
 }
 
 async fn list_users(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let users = sqlx::query_as::<_, User>("select id, full_name, email from users")
+    let users = sqlx::query_as!(User, r#"select id, full_name, email from users"#)
         .fetch_all(&state.pool)
         .await
-        .context("Failed to retrieve users directory from database")?;
+        .context("Failed to retrieve users from database")?;
     Ok(HtmlTemplate(UserListTemplate { users }))
 }
 
@@ -180,12 +230,15 @@ async fn get_user(
     Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
-    let user = sqlx::query_as::<_, User>("select id, full_name, email FROM users WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await
-        .with_context(|| format!("failed to retrieve user {id}"))?
-        .ok_or_else(|| anyhow::anyhow!("user {id} does not exist"))?;
+    let user = sqlx::query_as!(
+        User,
+        "select id, full_name, email FROM users WHERE id = $1",
+        id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .with_context(|| format!("failed to retrieve user {id}"))?
+    .ok_or_else(|| AppError::NotFound(format!("user {id} does not exist")))?;
 
     Ok(HtmlTemplate(UserDetailTemplate { user }))
 }
@@ -211,14 +264,10 @@ impl<T> IntoResponse for HtmlTemplate<T>
 where
     T: Template,
 {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         match self.0.render() {
             Ok(html) => Html(html).into_response(),
-            Err(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to render template. Error: {err}"),
-            )
-                .into_response(),
+            Err(err) => AppError::Internal(err.into()).into_response(),
         }
     }
 }
@@ -242,28 +291,47 @@ struct UserDetailTemplate {
     user: User,
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use axum::{
-//         body::Body,
-//         http::{Request, StatusCode},
-//     };
-//     use http_body_util::BodyExt;
-//
-//     use tower::ServiceExt;
-//
-//     #[tokio::test]
-//     async fn test_main() {
-//         let response = app()
-//             .oneshot(Request::get("/greet/Foo").body(Body::empty()).unwrap())
-//             .await
-//             .unwrap();
-//         assert_eq!(response.status(), StatusCode::OK);
-//         let body = response.into_body();
-//         let bytes = body.collect().await.unwrap().to_bytes();
-//         let html = String::from_utf8(bytes.to_vec()).unwrap();
-//
-//         assert_eq!(html, "<h1>Hello, Foo!</h1>");
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use http_body_util::BodyExt;
+
+    use tower::ServiceExt;
+
+    fn test_app() -> Router {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://postgres:postgres@localhost/app_db")
+            .expect("valid test database URL");
+
+        app().with_state(AppState { pool })
+    }
+
+    #[tokio::test]
+    async fn greet_returns_html() {
+        let response = test_app()
+            .oneshot(Request::get("/greet/Foo").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(html.contains("Hello, Foo!"));
+    }
+
+    #[tokio::test]
+    async fn unknown_route_returns_not_found() {
+        let response = test_app()
+            .oneshot(Request::get("/does-not-exist").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+}
