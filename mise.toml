@@ -7,5 +7,76 @@ watchexec = "latest"
 [env]
 _.file = [".env", ".env.local"]
 
+[tasks.run]
+description = "Run the server once"
+run = "cargo run -p server"
+
+[tasks.dev]
+description = "Run the server with automatic restart"
+depends = ["db:migrate"]
+run = """
+exec watchexec --restart \
+  --watch apps/ \
+  --watch assets/ \
+  --watch Cargo.toml \
+  --exts rs,html,toml,css,js \
+  -- cargo run -p server
+"""
+
+[tasks.check]
+description = "Run all tests"
+run = "cargo test --workspace"
+
+[tasks.fmt]
+description = "Format Rust code"
+run = "cargo fmt --all"
+
+[tasks."fmt:check"]
+description = "Check Rust formatting"
+run = "cargo fmt --all -- --check"
+
+[tasks.lint]
+description = "Run Clippy"
+run = "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+
+[tasks.ci]
+description = "Run local CI checks"
+depends = ["fmt:check", "lint", "test"]
+
+[tasks."db:up"]
+description = "Start PostgreSQL and wait until healthy"
+run = "docker compose up -d --wait db"
+
+[tasks."db:down"]
+description = "Stop Compose services"
+run = "docker compose down"
+
+[tasks."db:logs"]
+description = "Follow PostgreSQL logs"
+run = "docker compose logs -f db"
+
 [tasks."db:prompt"]
+description = "Open a PostgreSQL prompt"
+depends = ["db:up"]
 run = "docker compose exec db psql -U postgres -d app_db"
+
+[tasks."db:migrate"]
+description = "Apply pending migrations"
+run = "sqlx migrate run"
+
+[tasks."db:migrate:info"]
+description = "Show migration status"
+run = "sqlx migrate info"
+
+[tasks."db:migrate:new"]
+description = "Create a reversible migration"
+usage = 'arg "<name>" help="Migration name, for example create_posts"'
+run = 'sqlx migrate add --reversible "$usage_name"'
+
+[tasks."db:migrate:revert"]
+description = "Revert the latest reversible migration"
+run = "sqlx migrate revert"
+
+[tasks."db:reset"]
+description = "Drop, recreate, and migrate the development database"
+run = "sqlx database reset -y"
