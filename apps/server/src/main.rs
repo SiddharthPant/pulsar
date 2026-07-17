@@ -13,10 +13,11 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::{net::TcpListener, signal, time::sleep};
 use tower::ServiceBuilder;
 use tower_http::{
+    LatencyUnit,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
     timeout::TimeoutLayer,
-    trace::TraceLayer,
+    trace::{DefaultOnEos, DefaultOnResponse, TraceLayer},
 };
 use tracing::{error, info_span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -71,25 +72,28 @@ async fn main() -> anyhow::Result<()> {
             MakeRequestUuid,
         ))
         .layer(
-            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
-                let request_id = request.headers().get(REQUEST_ID_HEADER);
-                match request_id {
-                    Some(request_id) => info_span!(
-                        "request",
-                        request_id = ?request_id,
-                        method = %request.method(),
-                        uri = %request.uri(),
-                    ),
-                    None => {
-                        error!("could not extract request_id");
-                        info_span!(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<_>| {
+                    let request_id = request.headers().get(REQUEST_ID_HEADER);
+                    match request_id {
+                        Some(request_id) => info_span!(
                             "request",
+                            request_id = ?request_id,
                             method = %request.method(),
                             uri = %request.uri(),
-                        )
+                        ),
+                        None => {
+                            error!("could not extract request_id");
+                            info_span!(
+                                "request",
+                                method = %request.method(),
+                                uri = %request.uri(),
+                            )
+                        }
                     }
-                }
-            }),
+                })
+                .on_response(DefaultOnResponse::new().latency_unit(LatencyUnit::Micros))
+                .on_eos(DefaultOnEos::new().latency_unit(LatencyUnit::Micros)),
         )
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
@@ -112,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
         ))
         .layer(middleware);
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
     tracing::info!("listening on http://{}/", listener.local_addr().unwrap());
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -165,7 +169,7 @@ async fn handler() -> impl IntoResponse {
 }
 
 async fn list_users(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let users = sqlx::query_as::<_, User>("select id, name, email from users")
+    let users = sqlx::query_as::<_, User>("select id, full_name, email from users")
         .fetch_all(&state.pool)
         .await
         .context("Failed to retrieve users directory from database")?;
