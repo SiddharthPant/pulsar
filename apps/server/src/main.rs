@@ -1,19 +1,35 @@
 mod config;
-mod error;
-mod home;
-mod response;
-mod router;
-mod users;
+use server::{AppState, build_app};
 use std::{env, time::Duration};
 
 use anyhow::Context;
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, signal};
+use tower::make::Shared;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: PgPool,
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 #[tokio::main]
@@ -39,9 +55,9 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to connect to database")?;
 
-    let state = AppState { pool };
+    let state = AppState::new(pool);
 
-    let app = router::build_app(state, config.request_timeout);
+    let app = build_app(state, config.request_timeout);
 
     let listener = TcpListener::bind(config.bind_addr)
         .await
@@ -51,33 +67,9 @@ async fn main() -> anyhow::Result<()> {
         .local_addr()
         .context("failed to read listener address")?;
 
-    tracing::info!(%address, "server listening");
-    axum::serve(listener, app)
+    tracing::info!("server listening at http://{address}");
+    axum::serve(listener, Shared::new(app))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
 }
