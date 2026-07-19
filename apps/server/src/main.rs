@@ -8,6 +8,13 @@ use tokio::{net::TcpListener, signal};
 use tower::make::Shared;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const DEFAULT_LOG_FILTER: &str = concat!(
+    env!("CARGO_CRATE_NAME"),
+    "=debug,tower_http=debug,axum=trace"
+);
+
 async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
@@ -37,13 +44,8 @@ async fn main() -> anyhow::Result<()> {
     let config = config::Config::from_env()?;
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                format!(
-                    "{}=debug,tower_http=debug,axum=trace",
-                    env!("CARGO_CRATE_NAME")
-                )
-                .into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| DEFAULT_LOG_FILTER.into()),
         )
         .with(tracing_subscriber::fmt::layer().without_time())
         .init();
@@ -67,7 +69,12 @@ async fn main() -> anyhow::Result<()> {
         .local_addr()
         .context("failed to read listener address")?;
 
-    tracing::info!("server listening at http://{address}");
+    tracing::info!(
+        service = APP_NAME,
+        version = APP_VERSION,
+        url = %format_args!("http://{address}"),
+        "server listening"
+    );
     axum::serve(listener, Shared::new(app))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
