@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn users_receive_database_generated_values(pool: PgPool) {
     let (id, has_created_at, has_updated_at): (Uuid, bool, bool) = sqlx::query_as(
         r#"
@@ -24,7 +24,7 @@ async fn users_receive_database_generated_values(pool: PgPool) {
     assert!(has_updated_at);
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn user_emails_must_be_unique(pool: PgPool) {
     sqlx::query(
         r#"

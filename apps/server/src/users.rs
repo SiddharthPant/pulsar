@@ -36,10 +36,13 @@ struct UserDetailTemplate {
 }
 
 async fn list_users(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let users = sqlx::query_as!(User, r#"select id, full_name, email from users"#)
-        .fetch_all(&state.pool)
-        .await
-        .context("Failed to retrieve users from database")?;
+    let users = sqlx::query_as!(
+        User,
+        r#"select id, full_name, email from users order by full_name, id"#
+    )
+    .fetch_all(&state.pool)
+    .await
+    .context("Failed to retrieve users from database")?;
     Ok(HtmlTemplate::new(UserListTemplate { users }))
 }
 

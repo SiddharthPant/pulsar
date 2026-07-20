@@ -51,7 +51,7 @@ async fn seed_user(pool: &PgPool, full_name: &str, email: &str) -> Uuid {
     .expect("users should be inserted")
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn empty_user_directory_shows_empty_state(pool: PgPool) {
     let response = test_app(pool)
         .oneshot(get("/users"))
@@ -76,7 +76,7 @@ async fn empty_user_directory_shows_empty_state(pool: PgPool) {
     assert!(body.contains("No registered users found in the system."));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn user_directory_renders_database_users(pool: PgPool) {
     let ada_id = seed_user(&pool, "Ada Lovelace", "ada@example.com").await;
     let grace_id = seed_user(&pool, "Grace Hopper", "grace@example.com").await;
@@ -99,7 +99,7 @@ async fn user_directory_renders_database_users(pool: PgPool) {
     assert!(!body.contains("No registered users found"));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn existing_user_detail_is_rendered(pool: PgPool) {
     let id = seed_user(&pool, "Ada Lovelace", "ada@example.com").await;
 
@@ -118,7 +118,7 @@ async fn existing_user_detail_is_rendered(pool: PgPool) {
     assert!(body.contains("ada@example.com"));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn missing_user_returns_not_found(pool: PgPool) {
     let missing_id = Uuid::now_v7();
 
@@ -134,7 +134,7 @@ async fn missing_user_returns_not_found(pool: PgPool) {
     assert_eq!(body, format!("user {missing_id} does not exist"));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn malformed_user_id_returns_bad_request(pool: PgPool) {
     let response = test_app(pool)
         .oneshot(get("/users/not-a-uuid"))
@@ -144,7 +144,7 @@ async fn malformed_user_id_returns_bad_request(pool: PgPool) {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn user_content_is_html_escaped(pool: PgPool) {
     let dangerous_name = "<script>alert('hello')</script>";
     let id = seed_user(&pool, dangerous_name, "attacker@example.com").await;
@@ -163,7 +163,7 @@ async fn user_content_is_html_escaped(pool: PgPool) {
     assert!(body.contains("&#60;script&#62;"));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn database_failure_returns_sanitized_internal_error(pool: PgPool) {
     let app = test_app(pool.clone());
 
@@ -186,7 +186,7 @@ async fn database_failure_returns_sanitized_internal_error(pool: PgPool) {
     assert!(!body.contains("SQL"));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
+#[sqlx::test]
 async fn user_directory_is_ordered_by_name(pool: PgPool) {
     // Insert in the opposite order to the expected output.
     seed_user(&pool, "Grace Hopper", "grace@example.com").await;
