@@ -1,3 +1,4 @@
+mod auth;
 mod error;
 mod home;
 mod response;

@@ -17,7 +17,7 @@ use tower_http::{
 };
 use tracing::{error, info_span};
 
-use crate::{AppState, home, users};
+use crate::{AppState, auth, home, users};
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
 
@@ -58,6 +58,7 @@ pub fn build_app(state: AppState, request_timeout: Duration) -> NormalizePath<Ro
     let router = Router::new()
         .merge(home::routes())
         .nest("/users", users::routes())
+        .nest("/login", auth::routes())
         .fallback(not_found)
         .with_state(state)
         .nest_service("/assets", ServeDir::new("assets"))
