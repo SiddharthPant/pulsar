@@ -6,24 +6,25 @@ use axum::{
     routing::{get, post},
 };
 use datastar::prelude::ExecuteScript;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use tokio_stream::once;
 use tower_sessions::Session;
 
 use crate::{AppState, error::AppError, response::HtmlTemplate};
 
-pub fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/login", get(login_page))
-        .route("/login/handle", post(handle_login))
-        .route("/logout", post(logout))
-}
+const AUTH_USER_KEY: &str = "auth.user";
 
 // Templates, Inputs and other structs
 #[derive(Template)]
-#[template(path = "auth/login.html")]
+#[template(path = "pages/auth/login.html")]
 struct LoginTemplate;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SessionUser {
+    pub user_pid: String,
+    pub display_name: String,
+}
 
 #[derive(Debug, Deserialize)]
 struct LoginInput {
@@ -32,6 +33,16 @@ struct LoginInput {
 }
 
 // Functions
+impl SessionUser {
+    pub async fn from_session(session: &Session) -> Result<Option<Self>, AppError> {
+        session
+            .get(AUTH_USER_KEY)
+            .await
+            .map_err(anyhow::Error::from)
+            .map_err(AppError::from)
+    }
+}
+
 fn verify_password(password_text: &str) -> bool {
     if password_text.trim().is_empty() {
         tracing::info!("Password is empty");
@@ -41,6 +52,14 @@ fn verify_password(password_text: &str) -> bool {
         return false;
     }
     true
+}
+
+// Routes
+pub fn routes() -> Router<AppState> {
+    Router::new()
+        .route("/login", get(login_page))
+        .route("/login/handle", post(handle_login))
+        .route("/logout", post(logout))
 }
 
 // Handlers

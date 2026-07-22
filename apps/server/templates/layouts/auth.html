@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block page %}
+    <main class="auth-layout">
+        <div class="auth-layout__content">{% block content %}
+            {% endblock %}</div>
+    </main>
+{% endblock %}

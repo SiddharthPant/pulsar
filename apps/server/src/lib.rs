@@ -1,4 +1,5 @@
 mod auth;
+mod dashboard;
 mod error;
 mod home;
 mod page;

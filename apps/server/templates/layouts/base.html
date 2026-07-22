@@ -3,14 +3,13 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{% block title %}
-            {% endblock %}</title>
+        <title>{% block title %}Pulsar{% endblock %}</title>
         <link rel="icon" href="/assets/favicon.ico">
         <link rel="stylesheet" href="/assets/main.css">
         <script type="module" src="/assets/vendor/datastar.js"></script>
-        {% block styles %}
+        {% block head %}
         {% endblock %}
     </head>
-    <body>{% block body %}
+    <body class="app-body {% block body_class %}{% endblock %}">{% block page %}
         {% endblock %}</body>
 </html>
