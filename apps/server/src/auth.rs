@@ -2,10 +2,13 @@ use askama::Template;
 use axum::{
     Router,
     extract::Form,
-    response::{IntoResponse, Redirect},
+    response::{IntoResponse, Sse, sse::Event},
     routing::{get, post},
 };
+use datastar::prelude::ExecuteScript;
 use serde::Deserialize;
+use std::convert::Infallible;
+use tokio_stream::once;
 
 use crate::{AppState, error::AppError, response::HtmlTemplate};
 
@@ -28,11 +31,14 @@ struct LoginInput {
 
 // Functions
 fn verify_password(password_text: &str) -> bool {
-    if !password_text.is_empty() {
-        return true;
+    if password_text.trim().is_empty() {
+        tracing::info!("Password is empty");
+        return false;
+    } else if password_text.chars().count() <= 8 {
+        tracing::info!("Password is less than 8 characters long");
+        return false;
     }
-    tracing::info!("No password given");
-    false
+    true
 }
 
 // Handlers
@@ -44,6 +50,13 @@ async fn handle_login(Form(input): Form<LoginInput>) -> Result<impl IntoResponse
     tracing::info!("Inputs email={}, password={}", input.email, input.password);
     if verify_password(&input.password) {
         tracing::info!("Password verified");
+        let event =
+            ExecuteScript::new(r#"window.location.replace("/");"#).write_as_axum_sse_event();
+
+        return Ok(Sse::new(once(Ok::<Event, Infallible>(event))));
     }
-    Ok(Redirect::to("/"))
+
+    let event =
+        ExecuteScript::new(r#"console.log("Invalid credentials");"#).write_as_axum_sse_event();
+    Ok(Sse::new(once(Ok::<Event, Infallible>(event))))
 }
