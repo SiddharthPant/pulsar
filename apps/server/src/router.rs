@@ -15,6 +15,9 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::{DefaultOnEos, DefaultOnResponse, TraceLayer},
 };
+use tower_sessions::{
+    Expiry, MemoryStore, SessionManagerLayer, cookie::time::Duration as CookieDuration,
+};
 use tracing::{error, info_span};
 
 use crate::{AppState, auth, home, users};
@@ -55,13 +58,19 @@ pub fn build_app(state: AppState, request_timeout: Duration) -> NormalizePath<Ro
         )
         .layer(PropagateRequestIdLayer::new(x_request_id));
 
+    let session_layer = SessionManagerLayer::new(MemoryStore::default())
+        .with_name("pulsar.sid")
+        .with_secure(false)
+        .with_expiry(Expiry::OnInactivity(CookieDuration::days(1)));
+
     let router = Router::new()
         .merge(home::routes())
         .nest("/users", users::routes())
-        .nest("/login", auth::routes())
+        .nest("/auth", auth::routes())
         .fallback(not_found)
         .with_state(state)
         .nest_service("/assets", ServeDir::new("assets"))
+        .layer(session_layer)
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             request_timeout,

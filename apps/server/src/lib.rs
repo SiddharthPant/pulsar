@@ -1,6 +1,7 @@
 mod auth;
 mod error;
 mod home;
+mod page;
 mod response;
 mod router;
 mod users;

@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "auth/base.html" %}
 
 {% block title %}Login{% endblock %}
 
 {% block body %}
-    <form id="loginForm" data-on:submit="@post('/login/handle', { contentType: 'form', selector: '#loginForm' })">
+    <form id="loginForm" data-on:submit="@post('login/handle', { contentType: 'form', selector: '#loginForm' })">
         <label>
             Email:
             <input type="email" name="email" required />

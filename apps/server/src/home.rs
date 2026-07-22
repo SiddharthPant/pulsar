@@ -1,6 +1,7 @@
-use crate::{AppState, response::HtmlTemplate};
+use crate::{AppState, error::AppError, page::PageContext, response::HtmlTemplate};
 use askama::Template;
 use axum::{Router, response::IntoResponse, routing::get};
+use tower_sessions::Session;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/", get(home))
@@ -8,9 +9,11 @@ pub fn routes() -> Router<AppState> {
 
 #[derive(Template)]
 #[template(path = "hello.html")]
-struct HelloTemplate;
+struct HelloTemplate {
+    page: PageContext,
+}
 
-async fn home() -> impl IntoResponse {
-    let template = HelloTemplate {};
-    HtmlTemplate::new(template)
+async fn home(session: Session) -> Result<impl IntoResponse, AppError> {
+    let page = PageContext::from_session(&session).await?;
+    Ok(HtmlTemplate::new(HelloTemplate { page }))
 }

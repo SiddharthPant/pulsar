@@ -11,15 +11,6 @@
         {% block styles %}
         {% endblock %}
     </head>
-    <body>
-        <nav>
-            {% if page.is_authenticated() %}
-                <button type="button" data-on:click="@post('/auth/logout')">Logout</button>
-            {% else %}
-                <a href="/auth/login">Login</a>
-            {% endif %}
-        </nav>
-        {% block body %}
-        {% endblock %}
-    </body>
+    <body>{% block body %}
+        {% endblock %}</body>
 </html>
