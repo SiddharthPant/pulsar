@@ -3,7 +3,7 @@
 {% block title %}Login{% endblock %}
 
 {% block body %}
-    <form method="post" action="/login/handle">
+    <form id="loginForm">
         <label>
             Email:
             <input type="email" name="email" required />
@@ -12,6 +12,6 @@
             Password:
             <input type="password" name="password" required />
         </label>
-        <input type="submit" value="Submit">
+        <button data-on:click="@post('/login/handle', {contentType: 'form', selector: '#loginForm'})">Submit</button>
     </form>
 {% endblock %}
