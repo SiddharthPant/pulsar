@@ -1,17 +1,49 @@
 {% extends "layouts/auth.html" %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Login | Pulsar{% endblock %}
 
-{% block body %}
-    <form id="loginForm" data-on:submit="@post('login/handle', { contentType: 'form', selector: '#loginForm' })">
-        <label>
-            Email:
-            <input type="email" name="email" required />
-        </label>
-        <label>
-            Password:
-            <input type="password" name="password" required />
-        </label>
-        <button type="submit">Submit</button>
-    </form>
+{% block content %}
+  <section class="auth-card" aria-labelledby="login-title">
+    <header class="auth-card__header">
+      <h1 id="login-title">Login to your account</h1>
+      <p>Enter your email below to login to your account.</p>
+    </header>
+  </section>
+  <form id="login-form"
+        class="auth-form"
+        method="post"
+        action="/auth/login/"
+        data-on:submit="@post('login/handle', { contentType: 'form', selector: '#loginForm' })">
+    <div class="auth-field">
+      <label for="email">Email</label>
+      <input id="email"
+             type="email"
+             name="email"
+             value="{{ email }}"
+             autocomplete="username"
+             placeholder="m@example.com"
+             required
+             autofocus />
+    </div>
+    <div class="auth-field">
+      <label for="password">Password</label>
+      <input id="password"
+             type="password"
+             name="password"
+             autocomplete="current-password"
+             placeholder="***********"
+             minlength="8"
+             required />
+    </div>
+
+    <p id="login-error" class="auth-form__error" role="alert" aria-live="polite">
+      {% match error %}
+        {%when Some with (message) %}
+          {{ message }}
+        {% when None %}
+      {% endmatch %}
+    </p>
+
+    <button class="auth-form__submit" type="submit">Submit</button>
+  </form>
 {% endblock %}

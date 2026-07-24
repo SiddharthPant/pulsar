@@ -1,0 +1,13 @@
+{% extends "layouts/dashboard.html" %}
+
+{% block title %}Dashboard | Pulsar{% endblock %}
+
+{% block content %}
+  <section class="dashboard-page" aria-labelledby="dashboard-title">
+    <header class="page-header">
+      <p class="page-eyebrow">Overview</p>
+      <h1 id="dashboard-title">Dashboard</h1>
+      <p>Welcome back, {{ layout.current_user_name }}.</p>
+    </header>
+  </section>
+{% endblock %}

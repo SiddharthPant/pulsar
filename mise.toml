@@ -1,4 +1,5 @@
 [tools]
+"cargo:askama_fmt" = "latest"
 "cargo:sqlx-cli" = "0.9.0"
 rust = "1.97"
 rust-analyzer = "latest"
@@ -28,12 +29,18 @@ description = "Run all tests"
 run = "cargo test --workspace"
 
 [tasks.fmt]
-description = "Format Rust code"
-run = "cargo fmt --all"
+description = "Format Rust code and Askama templates"
+run = """
+cargo fmt --all
+askama_fmt apps/server/templates
+"""
 
 [tasks."fmt:check"]
-description = "Check Rust formatting"
-run = "cargo fmt --all -- --check"
+description = "Check Rust Askama and template formatting"
+run = """
+cargo fmt --all -- --check
+askama_fmt --check apps/server/templates
+"""
 
 [tasks.lint]
 description = "Run Clippy"

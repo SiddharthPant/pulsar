@@ -8,7 +8,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::{AppState, error::AppError, response::HtmlTemplate};
+use crate::{AppState, error::AppError, page::DashboardLayoutContext, response::HtmlTemplate};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -24,18 +24,23 @@ struct User {
 }
 
 #[derive(Template)]
-#[template(path = "user_list.html")]
+#[template(path = "pages/dashboard/users/index.html")]
 struct UserListTemplate {
+    layout: DashboardLayoutContext,
     users: Vec<User>,
 }
 
 #[derive(Template)]
-#[template(path = "user_detail.html")]
+#[template(path = "pages/dashboard/users/view.html")]
 struct UserDetailTemplate {
+    layout: DashboardLayoutContext,
     user: User,
 }
 
-async fn list_users(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+async fn list_users(
+    layout: DashboardLayoutContext,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
     let users = sqlx::query_as!(
         User,
         r#"select id, full_name, email from users order by full_name, id"#
@@ -43,10 +48,11 @@ async fn list_users(State(state): State<AppState>) -> Result<impl IntoResponse, 
     .fetch_all(&state.pool)
     .await
     .context("Failed to retrieve users from database")?;
-    Ok(HtmlTemplate::new(UserListTemplate { users }))
+    Ok(HtmlTemplate::new(UserListTemplate { layout, users }))
 }
 
 async fn get_user(
+    layout: DashboardLayoutContext,
     Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -60,5 +66,5 @@ async fn get_user(
     .with_context(|| format!("failed to retrieve user {id}"))?
     .ok_or_else(|| AppError::NotFound(format!("user {id} does not exist")))?;
 
-    Ok(HtmlTemplate::new(UserDetailTemplate { user }))
+    Ok(HtmlTemplate::new(UserDetailTemplate { layout, user }))
 }

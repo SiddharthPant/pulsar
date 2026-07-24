@@ -3,26 +3,26 @@
 {% block body_class %}landing-body{% endblock %}
 
 {% block page %}
-    <header class="landing-header">
-        <div class="site-container landing-header__inner">
-            <a class="site-brand" href="/">Pulsar</a>
+  <header class="landing-header">
+    <div class="site-container landing-header__inner">
+      <a class="site-brand" href="/">Pulsar</a>
 
-            <nav class="landing-nav" aria-label="Primary navigation">
-                {% if layout.is_authenticated() %}
-                    <a href="/dashboard">Dashboard</a>
-                {% else %}
-                    <a href="/auth/login">Login</a>
-                {% endif %}
-            </nav>
-        </div>
-    </header>
+      <nav class="landing-nav" aria-label="Primary navigation">
+        {% if layout.is_authenticated() %}
+          <a href="/dashboard">Dashboard</a>
+        {% else %}
+          <a href="/auth/login">Login</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
 
-    <main class="landing-main">
-        {% block content %}
-        {% endblock %}
-    </main>
+  <main class="landing-main">
+    {% block content %}
+    {% endblock %}
+  </main>
 
-    <footer class="landing-footer">
-        <div class="site-container">Pulsar</div>
-    </footer>
+  <footer class="landing-footer">
+    <div class="site-container">Pulsar</div>
+  </footer>
 {% endblock %}

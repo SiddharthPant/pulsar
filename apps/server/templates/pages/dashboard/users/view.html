@@ -1,22 +1,35 @@
-{% extends "auth/base.html" %}
+{% extends "layouts/dashboard.html" %}
 
 {% block title %}User Profile - {{ user.full_name }}{% endblock %}
 
-{% block body %}
-    <div class="card">
-        <h1>User Account Details</h1>
-        <div class="meta-item">
-            <span class="label">Database Key ID:</span>
+{% block content %}
+  <section class="dashboard-page" aria-labelledby="user-title">
+    <header class="page-header">
+      <p class="page-eyebrow">User profile</p>
+      <h1 id="user-title">{{ user.full_name }}</h1>
+    </header>
+    <div class="detail-card">
+      <dl class="detail-list">
+        <div class="detail-list__item">
+          <dt>Database Key ID</dt>
+          <dd>
             {{ user.id }}
+          </dd>
         </div>
-        <div class="meta-item">
-            <span class="label">Full Name:</span>
+        <div class="detail-list__item">
+          <dt>Full Name</dt>
+          <dd>
             {{ user.full_name }}
+          </dd>
         </div>
-        <div class="meta-item">
-            <span class="label">Email Address:</span>
+        <div class="detail-list__item">
+          <dt>Email Address</dt>
+          <dd>
             {{ user.email }}
+          </dd>
         </div>
-        <a href="/users" class="back-btn">&larr; Back to Directory</a>
+      </dl>
+      <a class="button-link" href="/dashboard/users">&larr; Back to Directory</a>
     </div>
+  </section>
 {% endblock %}

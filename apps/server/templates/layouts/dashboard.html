@@ -3,24 +3,28 @@
 {% block body_class %}dashboard-body{% endblock %}
 
 {% block page %}
-    <div class="dashboard-layout">
-        <aside class="dashboard-sidebar">
-            <a class="site-brand" href="/dashboard">Pulsar</a>
+  <div class="dashboard-layout">
+    <aside class="dashboard-sidebar">
+      <a class="site-brand" href="/dashboard">Pulsar</a>
 
-            <nav aria-label="Dashboard navigation">
-                <a href="/dashboard">Overview</a>
-                <a href="/users">Users</a>
-            </nav>
-        </aside>
-        <div class="dashboard-workspace">
-            <header class="dashboard-header">
-                <span>{{ layout.current_user_name }}</span>
-                <button type="button" data-on:click="@post('/auth/logout')">Logout</button>
-            </header>
-            <main class="dashboard-main">
-                {% block content %}
-                {% endblock %}
-            </main>
-        </div>
+      <nav aria-label="Dashboard navigation">
+        <a href="/dashboard">Overview</a>
+        <a href="/dashboard/users">Users</a>
+      </nav>
+    </aside>
+    <div class="dashboard-workspace">
+      <header class="dashboard-header">
+        <span>{{ layout.current_user_name }}</span>
+        <form method="post"
+              action="/auth/logout"
+              data-on:submit="@post('/auth/logout', {contentType: 'form'})">
+          <button type="button">Logout</button>
+        </form>
+      </header>
+      <main class="dashboard-main">
+        {% block content %}
+        {% endblock %}
+      </main>
     </div>
+  </div>
 {% endblock %}

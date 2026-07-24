@@ -1,7 +1,8 @@
-use askama::Template;
-use axum::response::{Html, IntoResponse, Response};
-
 use crate::error::AppError;
+use askama::Template;
+use axum::response::{Html, IntoResponse, Response, Sse, sse::Event};
+use std::convert::Infallible;
+use tokio_stream::once;
 
 pub struct HtmlTemplate<T>(T);
 
@@ -21,4 +22,8 @@ where
             Err(err) => AppError::Internal(err.into()).into_response(),
         }
     }
+}
+
+pub fn datastar_event(event: Event) -> Response {
+    Sse::new(once(Ok::<Event, Infallible>(event))).into_response()
 }

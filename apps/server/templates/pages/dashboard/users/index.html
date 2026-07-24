@@ -1,31 +1,40 @@
-{% extends "auth/base.html" %}
+{% extends "layouts/dashboard.html" %}
 
-{% block title %}User Directory{% endblock %}
+{% block title %}User Directory | Pulsar{% endblock %}
 
-{% block body %}
-    <h1>User Directory</h1>
+{% block content %}
+  <section class="dashboard-page" aria-labelledby="users-title">
+    <header class="page-header">
+      <p class="page-eyebrow">Administration</p>
+      <h1 id="users-title">User Directory</p>
+    </header>
     {% if users.is_empty() %}
+      <div class="empty-state">
         <p>No registered users found in the system.</p>
+      </div>
     {% else %}
+      <div class="table-card table-scroll">
         <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Full Name</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                    <tr>
-                        <td>{{ user.id }}</td>
-                        <td>{{ user.full_name }}</td>
-                        <td>
-                            <a href="/users/{{ user.id }}">View Profile &rarr;</a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Full Name</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+              <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.full_name }}</td>
+                <td>
+                  <a href="/users/{{ user.id }}">View Profile &rarr;</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
+      </div>
     {% endif %}
+  </section>
 {% endblock %}
